@@ -1,15 +1,19 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { Alert, Anchor, Button, Drawer, MantineProvider, Modal, Progress, Table } from '@mantine/core';
-import { useDisclosure, useMediaQuery } from '@mantine/hooks';
-import '@mantine/core/styles.css';
+import { Alert, Anchor, Button, Modal, Table } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import Board, { type SquareMark } from '../../components/Board';
+import ExerciseProvider from '../../components/exercise/ExerciseProvider';
+import GearIcon from '../../components/exercise/GearIcon';
+import NextButton from '../../components/exercise/NextButton';
+import ProgressStatus from '../../components/exercise/ProgressStatus';
+import SettingsDrawer from '../../components/exercise/SettingsDrawer';
+import { useCountdown, wholeSeconds } from '../../components/exercise/useCountdown';
 import { boardFenWithout, loadPositions, pickRound, type Color } from '../../lib/positions';
 import { readJson, writeJson } from '../../lib/storage';
 import { correctCount, initialState, isCorrect, reduce, type NewRound, type Round, type State } from './machine';
 import PiecePicker, { PieceIcon } from './PiecePicker';
 import SettingsPanel from './SettingsPanel';
 import { matchPreset, sanitize, type PresetName, type Settings } from './settings';
-import { cssVariablesResolver, theme } from './theme';
 import './MissingPiece.css';
 
 const SETTINGS_KEY = 'aesymnetes:missing-piece:settings';
@@ -18,6 +22,8 @@ const BEST_KEY = 'aesymnetes:missing-piece:best-correct';
 const NEXT_AFTER_SECONDS = 4;
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
 const PRESET_LABEL: Record<PresetName, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+const INTRO =
+  'Memorise the position. One piece will be removed. Click the square it stood on, then say which piece it was.';
 
 type Best = Partial<Record<PresetName, number>>;
 type Notice = { kind: 'load' | 'empty'; text: string } | null;
@@ -42,11 +48,6 @@ async function drawRound(settings: Settings, usedIds: readonly string[], index: 
   const orientation: Color =
     settings.side === 'random' ? (Math.random() < 0.5 ? 'white' : 'black') : settings.side;
   return { ...picked, orientation };
-}
-
-/** Whole seconds left, counting down to 0. */
-function seconds(ms: number): string {
-  return String(Math.max(0, Math.ceil(ms / 1000)));
 }
 
 function pieceQuestion(round: Round, settings: Settings): string {
@@ -94,7 +95,6 @@ function Exercise() {
   const [best, setBest] = useState<Best>(loadBest);
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState(false);
-  const [remaining, setRemaining] = useState<number | null>(null);
 
   const { phase, round, settings, roundIndex } = state;
   const preset = matchPreset(settings);
@@ -108,7 +108,6 @@ function Exercise() {
 
   const bestAtStart = useRef<Best>(best);
   const [settingsOpen, { open: openSettings, close: closeSettings }] = useDisclosure(false);
-  const isNarrow = useMediaQuery('(max-width: 899px)') ?? false;
 
   const begin = async () => {
     bestAtStart.current = best;
@@ -142,36 +141,16 @@ function Exercise() {
   };
 
   // Three countdowns: the time to memorise, the time to find the square, and the pause on the
-  // result before the next position. One effect owns the timer, so it is cleared the moment the
-  // phase changes and a click and a timeout cannot both act.
-  const countdown =
+  // result before the next position.
+  const remaining = useCountdown(
     phase === 'memorise'
-      ? { seconds: settings.memoriseSeconds, done: () => dispatch({ type: 'ready', now: Date.now() }) }
+      ? { key: `memorise-${roundIndex}`, seconds: settings.memoriseSeconds, onDone: () => dispatch({ type: 'ready', now: Date.now() }) }
       : phase === 'guessSquare'
-        ? { seconds: settings.guessSeconds, done: () => dispatch({ type: 'guessTimeout' }) }
+        ? { key: `guess-${roundIndex}`, seconds: settings.guessSeconds, onDone: () => dispatch({ type: 'guessTimeout' }) }
         : phase === 'result'
-          ? { seconds: NEXT_AFTER_SECONDS, done: () => void next() }
-          : null;
-  const countdownSeconds = countdown?.seconds ?? null;
-  const countdownDone = useRef<() => void>(() => {});
-  countdownDone.current = countdown?.done ?? (() => {});
-  useEffect(() => {
-    if (countdownSeconds === null) {
-      setRemaining(null);
-      return;
-    }
-    const deadline = Date.now() + countdownSeconds * 1000;
-    setRemaining(deadline - Date.now());
-    const id = setInterval(() => {
-      const left = deadline - Date.now();
-      setRemaining(left);
-      if (left <= 0) {
-        clearInterval(id);
-        countdownDone.current();
-      }
-    }, 100);
-    return () => clearInterval(id);
-  }, [phase, roundIndex, countdownSeconds]);
+          ? { key: `result-${roundIndex}`, seconds: NEXT_AFTER_SECONDS, onDone: () => void next() }
+          : null,
+  );
 
   useEffect(() => {
     if (phase !== 'mask') return;
@@ -198,28 +177,15 @@ function Exercise() {
   const positionsDone = state.history.length + (phase === 'result' ? 1 : 0);
 
   return (
-    <div className="mp">
-      <div className="mp-board">
+    <div className="ex">
+      <div className="ex-board">
         <Board {...boardView(state, (square) => dispatch({ type: 'clickSquare', square }))} />
       </div>
 
-      <div className="mp-panel">
-        <h1 className="mp-title">Missing piece</h1>
+      <div className="ex-panel">
+        <h1 className="ex-title">Missing piece</h1>
 
-        {inSession && (
-          <div className="mp-status">
-            <Progress
-              value={(100 * positionsDone) / settings.rounds}
-              size="md"
-              radius="xl"
-              aria-label={`Position ${roundIndex + 1} of ${settings.rounds}`}
-              className="mp-progress"
-            />
-            <span className="mp-progress-count">
-              {roundIndex + 1}/{settings.rounds}
-            </span>
-          </div>
-        )}
+        {inSession && <ProgressStatus done={positionsDone} current={roundIndex + 1} total={settings.rounds} />}
 
         {phase === 'idle' && (
           <>
@@ -228,16 +194,10 @@ function Exercise() {
                 {notice.text}
               </Alert>
             )}
-            <Button className="mp-start" size="xl" fullWidth loading={busy} onClick={begin}>
+            <Button className="ex-start" size="xl" fullWidth loading={busy} onClick={begin}>
               {notice?.kind === 'load' ? 'Try again' : 'Start'}
             </Button>
-            <Button
-              variant="subtle"
-              color="gray"
-              leftSection={<GearIcon />}
-              onClick={openSettings}
-              disabled={busy}
-            >
+            <Button variant="subtle" color="gray" leftSection={<GearIcon />} onClick={openSettings} disabled={busy}>
               Settings: {preset === 'custom' ? 'Custom' : PRESET_LABEL[preset]}
             </Button>
           </>
@@ -245,46 +205,47 @@ function Exercise() {
 
         {phase === 'memorise' && (
           <>
-            <div className="mp-clock" role="timer" aria-label="Seconds left to memorise">
-              {seconds(remaining ?? settings.memoriseSeconds * 1000)}
+            <div className="ex-clock" role="timer" aria-label="Seconds left to memorise">
+              {wholeSeconds(remaining ?? settings.memoriseSeconds * 1000)}
             </div>
-            <p className="mp-prompt">Memorise the position.</p>
+            <p className="ex-prompt">Memorise the position.</p>
           </>
         )}
 
-        {phase === 'mask' && <p className="mp-prompt">Removing one piece.</p>}
+        {phase === 'mask' && <p className="ex-prompt">Removing one piece.</p>}
 
         {phase === 'guessSquare' && round && (
           <>
-            <div className="mp-clock mp-clock-guess" role="timer" aria-label="Seconds left to find the square">
-              {seconds(remaining ?? settings.guessSeconds * 1000)}
+            <div className="ex-clock ex-clock-small" role="timer" aria-label="Seconds left to find the square">
+              {wholeSeconds(remaining ?? settings.guessSeconds * 1000)}
             </div>
-            <p className="mp-prompt">One piece is gone. Click the square it stood on.</p>
-            <p className="mp-note" aria-live="polite">
+            <p className="ex-prompt">One piece is gone. Click the square it stood on.</p>
+            <p className="ex-note" aria-live="polite">
               {round.wrongSquares.length > 0 && 'Not that square. '}
               {triesLeft === 1 ? '1 try left.' : `${triesLeft} tries left.`}
             </p>
           </>
         )}
 
-        {phase === 'guessPiece' && round && <p className="mp-prompt">{pieceQuestion(round, settings)}</p>}
+        {phase === 'guessPiece' && round && <p className="ex-prompt">{pieceQuestion(round, settings)}</p>}
 
         {phase === 'result' && round && round.guess && (
           <>
             <div className="mp-answer">
               <PieceIcon color={round.target.color} role={round.target.role} />
-              <p className={`mp-verdict ${verdict(round).right ? 'is-right' : 'is-wrong'}`} role="status">
+              <p className={`ex-verdict ${verdict(round).right ? 'is-right' : 'is-wrong'}`} role="status">
                 {verdict(round).text}
               </p>
             </div>
-            <Button className="mp-next" size="xl" fullWidth loading={busy} onClick={next}>
-              {isLastRound ? 'See summary' : 'Next position'}
-              <span className="mp-next-in" aria-hidden="true">
-                {seconds(remaining ?? NEXT_AFTER_SECONDS * 1000)}
-              </span>
-            </Button>
+            <NextButton
+              label={isLastRound ? 'See summary' : 'Next position'}
+              msLeft={remaining}
+              seconds={NEXT_AFTER_SECONDS}
+              busy={busy}
+              onClick={next}
+            />
             <Anchor
-              className="mp-lichess"
+              className="ex-lichess"
               href={`https://lichess.org/training/${round.position.id}`}
               target="_blank"
               rel="noreferrer"
@@ -298,15 +259,15 @@ function Exercise() {
 
         {phase === 'summary' && (
           <>
-            <div className="mp-clock" aria-label="Correct positions">
+            <div className="ex-clock" aria-label="Correct positions">
               {correct}/{state.history.length}
             </div>
-            <p className="mp-prompt">
+            <p className="ex-prompt">
               correct{preset !== 'custom' && ` on ${PRESET_LABEL[preset]}`}.
               {newBest && ' Your best so far.'}
               {!newBest && preset !== 'custom' && best[preset] !== undefined && ` Your best is ${best[preset]}.`}
             </p>
-            <Table className="mp-rounds" verticalSpacing={4} horizontalSpacing="xs">
+            <Table className="ex-rounds" verticalSpacing={4} horizontalSpacing="xs">
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>#</Table.Th>
@@ -335,7 +296,7 @@ function Exercise() {
                 {notice.text}
               </Alert>
             )}
-            <div className="mp-actions">
+            <div className="ex-actions">
               <Button size="md" loading={busy} onClick={begin}>
                 Play again
               </Button>
@@ -345,7 +306,6 @@ function Exercise() {
             </div>
           </>
         )}
-
       </div>
 
       {/* Answering is the only way out: no close button, no Escape, no click outside. */}
@@ -361,53 +321,25 @@ function Exercise() {
         title={round ? pieceQuestion(round, settings) : ''}
         classNames={{ title: 'mp-dialog-title' }}
       >
-        <PiecePicker
-          key={roundIndex}
-          onSubmit={(guess) => dispatch({ type: 'submitPiece', guess, now: Date.now() })}
-        />
+        <PiecePicker key={roundIndex} onSubmit={(guess) => dispatch({ type: 'submitPiece', guess, now: Date.now() })} />
       </Modal>
 
-      <Drawer
+      <SettingsDrawer
         opened={settingsOpen}
         onClose={closeSettings}
-        position={isNarrow ? 'bottom' : 'right'}
-        size={isNarrow ? '90%' : 'md'}
-        title="Settings"
-        classNames={{ title: 'mp-drawer-title' }}
+        intro={INTRO}
+        best={preset !== 'custom' && best[preset] !== undefined ? `Best on ${PRESET_LABEL[preset]}: ${best[preset]}` : undefined}
       >
-        <div className="mp-drawer-body">
-          <p className="mp-lead">
-            Memorise the position. One piece will be removed. Click the square it stood on, then say
-            which piece it was.
-          </p>
-          <SettingsPanel settings={settings} onChange={changeSettings} />
-          {preset !== 'custom' && best[preset] !== undefined && (
-            <p className="mp-best">
-              Best on {PRESET_LABEL[preset]}: {best[preset]}
-            </p>
-          )}
-          <Button fullWidth onClick={closeSettings}>
-            Done
-          </Button>
-        </div>
-      </Drawer>
+        <SettingsPanel settings={settings} onChange={changeSettings} />
+      </SettingsDrawer>
     </div>
-  );
-}
-
-function GearIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
   );
 }
 
 export default function MissingPiece() {
   return (
-    <MantineProvider theme={theme} cssVariablesResolver={cssVariablesResolver} defaultColorScheme="auto">
+    <ExerciseProvider>
       <Exercise />
-    </MantineProvider>
+    </ExerciseProvider>
   );
 }

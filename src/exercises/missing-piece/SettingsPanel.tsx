@@ -1,19 +1,7 @@
-import type { ReactNode } from 'react';
 import { RangeSlider, SegmentedControl, Slider, Switch } from '@mantine/core';
+import Field from '../../components/exercise/SettingsField';
 import type { Removable } from '../../lib/positions';
 import { LIMITS, PRESETS, matchPreset, type PresetName, type Settings, type Side } from './settings';
-
-function Field(p: { label: string; value?: string; children: ReactNode }) {
-  return (
-    <div className="mp-field">
-      <div className="mp-field-head">
-        <span className="mp-field-label">{p.label}</span>
-        {p.value !== undefined && <span className="mp-field-value">{p.value}</span>}
-      </div>
-      {p.children}
-    </div>
-  );
-}
 
 export default function SettingsPanel(p: { settings: Settings; onChange: (s: Settings) => void }) {
   const s = p.settings;
@@ -21,7 +9,7 @@ export default function SettingsPanel(p: { settings: Settings; onChange: (s: Set
   const preset = matchPreset(s);
 
   return (
-    <div className="mp-settings">
+    <div className="ex-settings">
       <SegmentedControl
         fullWidth
         aria-label="Preset"
@@ -137,7 +125,7 @@ export default function SettingsPanel(p: { settings: Settings; onChange: (s: Set
         />
       </Field>
 
-      <div className="mp-switches">
+      <div className="ex-switches">
         <Switch
           label="Show coordinates"
           checked={s.coordinates}
