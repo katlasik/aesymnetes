@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type MouseEvent } from 'react';
 import { Chessground } from 'chessground';
 import type { Api } from 'chessground/api';
 import type { Config } from 'chessground/config';
@@ -24,6 +24,7 @@ export interface BoardProps {
 }
 
 const EMPTY_FEN = '8/8/8/8/8/8/8/8';
+const DRAG_TOLERANCE_PX = 10;
 
 function boardConfig(p: BoardProps): Config {
   const marks = p.hidden ? {} : (p.marks ?? {});
@@ -53,12 +54,10 @@ export default function Board(props: BoardProps) {
       coordinates: props.coordinates,
       // A removed piece must not fade or slide away: that would give the answer.
       animation: { enabled: false },
-      movable: { free: false, color: undefined },
-      premovable: { enabled: false },
-      draggable: { enabled: false },
-      selectable: { enabled: false },
+      // View-only: chessground binds no pointer handlers of its own. Its handlers act on
+      // touchstart, which would turn a scroll gesture into a guess and block page scrolling.
+      viewOnly: true,
       drawable: { enabled: false },
-      events: { select: (key) => onClick.current?.(key) },
     });
     api.current = cg;
     return () => {
@@ -74,15 +73,27 @@ export default function Board(props: BoardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.fen, props.orientation, props.hidden, markKey]);
 
-  // Chessground caches the board's screen position and only refreshes it on scroll or resize.
-  // Content above the board can move it without either, so drop the cache before each press.
-  const refreshBounds = () => api.current?.state.dom.bounds.clear();
+  const pressedAt = useRef<{ x: number; y: number } | null>(null);
+
+  // A click is a real tap or press-and-release; scroll gestures never produce one.
+  const handleClick = (e: MouseEvent<HTMLDivElement>) => {
+    const cg = api.current;
+    if (!cg || !onClick.current) return;
+    // A mouse drag across the board still ends in a click; ignore it if the pointer travelled.
+    const down = pressedAt.current;
+    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > DRAG_TOLERANCE_PX) return;
+    // Chessground caches the board's screen position and only refreshes it on scroll or resize.
+    // Content above the board can move it without either, so drop the cache before each lookup.
+    cg.state.dom.bounds.clear();
+    const key = cg.getKeyAtDomPos([e.clientX, e.clientY]);
+    if (key) onClick.current(key);
+  };
 
   return (
     <div
       className={`board-frame${props.onSquareClick ? ' is-clickable' : ''}`}
-      onMouseDownCapture={refreshBounds}
-      onTouchStartCapture={refreshBounds}
+      onPointerDown={(e) => (pressedAt.current = { x: e.clientX, y: e.clientY })}
+      onClick={handleClick}
     >
       <div ref={el} className="board-surface" />
     </div>
