@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import type { AstroIntegration } from 'astro';
-// @ts-expect-error plain JS module shared with scripts/feedback.mjs
+// Plain JS module shared with scripts/feedback.mjs.
 import { saveNote } from '../../../scripts/feedback-inbox.mjs';
 
 export const SEND_EVENT = 'aesymnetes-feedback:send';

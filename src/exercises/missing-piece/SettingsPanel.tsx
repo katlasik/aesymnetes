@@ -3,8 +3,6 @@ import { RangeSlider, SegmentedControl, Slider, Switch } from '@mantine/core';
 import type { Removable } from '../../lib/positions';
 import { LIMITS, PRESETS, matchPreset, type PresetName, type Settings, type Side } from './settings';
 
-const DEFAULT_TIMED_SECONDS = 20;
-
 function Field(p: { label: string; value?: string; children: ReactNode }) {
   return (
     <div className="mp-field">
@@ -52,22 +50,26 @@ export default function SettingsPanel(p: { settings: Settings; onChange: (s: Set
         />
       </Field>
 
-      <Field label="Time to memorise" value={s.memoriseSeconds === null ? 'No limit' : `${s.memoriseSeconds} s`}>
-        <Switch
-          label="Limit the time"
-          checked={s.memoriseSeconds !== null}
-          onChange={(e) => set({ memoriseSeconds: e.currentTarget.checked ? DEFAULT_TIMED_SECONDS : null })}
+      <Field label="Time to memorise" value={`${s.memoriseSeconds} s`}>
+        <Slider
+          aria-label="Seconds to memorise"
+          min={LIMITS.memoriseSeconds[0]}
+          max={LIMITS.memoriseSeconds[1]}
+          label={null}
+          value={s.memoriseSeconds}
+          onChange={(memoriseSeconds) => set({ memoriseSeconds })}
         />
-        {s.memoriseSeconds !== null && (
-          <Slider
-            aria-label="Seconds to memorise"
-            min={LIMITS.memoriseSeconds[0]}
-            max={LIMITS.memoriseSeconds[1]}
-            label={null}
-            value={s.memoriseSeconds}
-            onChange={(memoriseSeconds) => set({ memoriseSeconds })}
-          />
-        )}
+      </Field>
+
+      <Field label="Time to find the square" value={`${s.guessSeconds} s`}>
+        <Slider
+          aria-label="Seconds to find the square"
+          min={LIMITS.guessSeconds[0]}
+          max={LIMITS.guessSeconds[1]}
+          label={null}
+          value={s.guessSeconds}
+          onChange={(guessSeconds) => set({ guessSeconds })}
+        />
       </Field>
 
       <Field label="Board hidden before guessing" value={`${(s.maskMs / 1000).toFixed(1)} s`}>
@@ -140,11 +142,6 @@ export default function SettingsPanel(p: { settings: Settings; onChange: (s: Set
           label="Show coordinates"
           checked={s.coordinates}
           onChange={(e) => set({ coordinates: e.currentTarget.checked })}
-        />
-        <Switch
-          label="Bonus points for speed"
-          checked={s.speedBonus}
-          onChange={(e) => set({ speedBonus: e.currentTarget.checked })}
         />
       </div>
     </div>

@@ -43,13 +43,31 @@ test('sanitize replaces wrong-typed fields with the easy value', () => {
     side: 5,
     coordinates: 'yes',
     memoriseSeconds: 'ten',
+    guessSeconds: 'soon',
     attempts: Number.NaN,
   });
   expect(s).toMatchObject({
     removable: 'any',
     side: 'white',
     coordinates: true,
-    memoriseSeconds: null,
+    memoriseSeconds: 10,
+    guessSeconds: 5,
     attempts: 3,
   });
+});
+
+test('every preset counts down 10 seconds to memorise and gives 5 seconds to find the square', () => {
+  for (const p of Object.values(PRESETS)) {
+    expect(p.memoriseSeconds).toBe(10);
+    expect(p.guessSeconds).toBe(5);
+  }
+});
+
+test('sanitize turns the old untimed setting into the default countdown', () => {
+  expect(sanitize({ ...PRESETS.easy, memoriseSeconds: null }).memoriseSeconds).toBe(10);
+});
+
+test('sanitize clamps the time to find the square', () => {
+  expect(sanitize({ ...PRESETS.easy, guessSeconds: 0 }).guessSeconds).toBe(2);
+  expect(sanitize({ ...PRESETS.easy, guessSeconds: 99 }).guessSeconds).toBe(30);
 });

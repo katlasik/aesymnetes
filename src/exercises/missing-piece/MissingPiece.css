@@ -8,7 +8,7 @@
 @media (min-width: 900px) {
   .mp {
     /* The board column is only as wide as the board can be, so the panel stays beside it. */
-    grid-template-columns: minmax(0, calc(100dvh - 120px)) minmax(280px, 340px);
+    grid-template-columns: minmax(0, calc(100dvh - 48px)) minmax(280px, 340px);
     justify-content: center;
     gap: 48px;
   }
@@ -18,6 +18,17 @@
 .mp-start {
   height: 64px;
   font-size: 1.375rem;
+}
+
+/* Smaller than the memorise clock, so it stays secondary while the user looks at the board. */
+.mp-clock-guess {
+  font-size: clamp(2.5rem, 8vw, 4rem);
+}
+
+.mp-dialog-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  max-width: 34ch;
 }
 
 .mp-drawer-title {
@@ -73,17 +84,19 @@
 
 .mp-status {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   align-self: stretch;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 0.9375rem;
-  font-variant-numeric: tabular-nums;
 }
 
-.mp-status strong {
-  color: var(--ink);
+.mp-progress {
+  flex: 1;
+}
+
+.mp-progress-count {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
 }
 
 /* The chess clock: the one loud element. Used for the countdown and the final score. */
@@ -108,46 +121,42 @@
   font-variant-numeric: tabular-nums;
 }
 
-.mp-quit {
-  margin-top: 8px;
-  margin-left: -8px;
-}
-
 .mp-answer {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.mp-score-lines {
-  align-self: stretch;
-  max-width: 260px;
+.mp-verdict {
+  font-size: 1.1875rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.is-right {
+  color: var(--good);
+}
+
+.is-wrong {
+  color: var(--bad);
+}
+
+.mp-next {
+  height: 64px;
+  font-size: 1.375rem;
+}
+
+/* Seconds until the next position starts by itself. */
+.mp-next-in {
+  margin-left: 12px;
+  min-width: 1ch;
+  font-weight: 400;
+  opacity: 0.7;
   font-variant-numeric: tabular-nums;
 }
 
-.mp-score-lines > div {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-}
-
-.mp-score-lines dt {
-  color: var(--muted);
-}
-
-.mp-score-lines dd {
-  margin: 0;
-}
-
-.mp-score-lines .mp-score-total {
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-  font-weight: 600;
-}
-
-.mp-score-lines .mp-score-total dt {
-  color: var(--ink);
+.mp-lichess {
+  margin-top: 24px;
 }
 
 .mp-rounds {

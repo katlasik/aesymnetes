@@ -3,8 +3,10 @@ import type { Removable } from '../../lib/positions';
 export type Side = 'white' | 'black' | 'random';
 
 export interface Settings {
-  /** Seconds the position stays visible; null means untimed. */
-  memoriseSeconds: number | null;
+  /** Seconds the position stays visible, counted down on screen. */
+  memoriseSeconds: number;
+  /** Seconds to find the square once the piece is gone; then the square is revealed. */
+  guessSeconds: number;
   /** How long the board is hidden between memorising and guessing. */
   maskMs: number;
   minPieces: number;
@@ -23,6 +25,7 @@ export type PresetName = 'easy' | 'medium' | 'hard';
 
 export const LIMITS = {
   memoriseSeconds: [3, 120],
+  guessSeconds: [2, 30],
   maskMs: [0, 3000],
   pieces: [4, 32],
   attempts: [1, 5],
@@ -31,7 +34,8 @@ export const LIMITS = {
 
 export const PRESETS: Record<PresetName, Settings> = {
   easy: {
-    memoriseSeconds: null,
+    memoriseSeconds: 10,
+    guessSeconds: 5,
     maskMs: 1000,
     minPieces: 4,
     maxPieces: 10,
@@ -43,7 +47,8 @@ export const PRESETS: Record<PresetName, Settings> = {
     rounds: 10,
   },
   medium: {
-    memoriseSeconds: 20,
+    memoriseSeconds: 10,
+    guessSeconds: 5,
     maskMs: 1000,
     minPieces: 10,
     maxPieces: 20,
@@ -56,6 +61,7 @@ export const PRESETS: Record<PresetName, Settings> = {
   },
   hard: {
     memoriseSeconds: 10,
+    guessSeconds: 5,
     maskMs: 1000,
     minPieces: 20,
     maxPieces: 32,
@@ -97,12 +103,8 @@ export function sanitize(raw: unknown): Settings {
   const a = num(r.minPieces, LIMITS.pieces, d.minPieces);
   const b = num(r.maxPieces, LIMITS.pieces, d.maxPieces);
   return {
-    memoriseSeconds:
-      r.memoriseSeconds === null
-        ? null
-        : typeof r.memoriseSeconds === 'number' && Number.isFinite(r.memoriseSeconds)
-          ? num(r.memoriseSeconds, LIMITS.memoriseSeconds, LIMITS.memoriseSeconds[0])
-          : d.memoriseSeconds,
+    memoriseSeconds: num(r.memoriseSeconds, LIMITS.memoriseSeconds, d.memoriseSeconds),
+    guessSeconds: num(r.guessSeconds, LIMITS.guessSeconds, d.guessSeconds),
     maskMs: num(r.maskMs, LIMITS.maskMs, d.maskMs),
     minPieces: Math.min(a, b),
     maxPieces: Math.max(a, b),

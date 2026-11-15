@@ -1,11 +1,11 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { Alert, Anchor, Button, Drawer, MantineProvider, Table } from '@mantine/core';
+import { Alert, Anchor, Button, Drawer, MantineProvider, Modal, Progress, Table } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import '@mantine/core/styles.css';
 import Board, { type SquareMark } from '../../components/Board';
 import { boardFenWithout, loadPositions, pickRound, type Color } from '../../lib/positions';
 import { readJson, writeJson } from '../../lib/storage';
-import { initialState, reduce, sessionTotal, type NewRound, type Round, type State } from './machine';
+import { correctCount, initialState, isCorrect, reduce, type NewRound, type Round, type State } from './machine';
 import PiecePicker, { PieceIcon } from './PiecePicker';
 import SettingsPanel from './SettingsPanel';
 import { matchPreset, sanitize, type PresetName, type Settings } from './settings';
@@ -13,7 +13,9 @@ import { cssVariablesResolver, theme } from './theme';
 import './MissingPiece.css';
 
 const SETTINGS_KEY = 'aesymnetes:missing-piece:settings';
-const BEST_KEY = 'aesymnetes:missing-piece:best';
+// Best number of correct positions per preset. (The old key held points.)
+const BEST_KEY = 'aesymnetes:missing-piece:best-correct';
+const NEXT_AFTER_SECONDS = 4;
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
 const PRESET_LABEL: Record<PresetName, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
@@ -41,9 +43,16 @@ async function drawRound(settings: Settings, usedIds: readonly string[]): Promis
   return { ...picked, orientation };
 }
 
-function clock(ms: number): string {
-  const total = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+/** Whole seconds left, counting down to 0. */
+function seconds(ms: number): string {
+  return String(Math.max(0, Math.ceil(ms / 1000)));
+}
+
+function pieceQuestion(round: Round, settings: Settings): string {
+  const sq = round.target.square;
+  if (!round.revealed) return `Yes, ${sq}. Which piece was it?`;
+  const outOfTries = round.wrongSquares.length >= settings.attempts;
+  return `${outOfTries ? 'Out of tries' : "Time's up"}. The piece stood on ${sq}. Which piece was it?`;
 }
 
 function boardView(state: State, onSquare: (sq: string) => void) {
@@ -65,27 +74,16 @@ function boardView(state: State, onSquare: (sq: string) => void) {
   };
 }
 
-function ScoreLines({ round }: { round: Round }) {
-  const score = round.score!;
-  const rows: [string, number][] = [
-    ['Square', score.square],
-    ['Piece', score.piece],
-  ];
-  if (score.bonus > 0) rows.push(['Speed bonus', score.bonus]);
-  return (
-    <dl className="mp-score-lines">
-      {rows.map(([label, points]) => (
-        <div key={label}>
-          <dt>{label}</dt>
-          <dd>{points}</dd>
-        </div>
-      ))}
-      <div className="mp-score-total">
-        <dt>This position</dt>
-        <dd>{score.total}</dd>
-      </div>
-    </dl>
-  );
+/** What happened this round, in one sentence; the answer is always named. */
+function verdict(round: Round): { right: boolean; text: string } {
+  const { color, role, square } = round.target;
+  const answer = `the ${color} ${role} on ${square}`;
+  if (isCorrect(round)) return { right: true, text: `Correct: ${answer}.` };
+  const guess = round.guess!;
+  const pieceRight = guess.color === color && guess.role === role;
+  if (round.revealed && pieceRight) return { right: false, text: `Right piece, but you missed the square. It was ${answer}.` };
+  if (round.revealed) return { right: false, text: `Wrong. It was ${answer}, not the ${guess.color} ${guess.role}.` };
+  return { right: false, text: `Right square, wrong piece. It was ${answer}, not the ${guess.color} ${guess.role}.` };
 }
 
 function Exercise() {
@@ -99,7 +97,7 @@ function Exercise() {
 
   const { phase, round, settings, roundIndex } = state;
   const preset = matchPreset(settings);
-  const total = sessionTotal(state);
+  const correct = correctCount(state);
 
   const changeSettings = (next: Settings) => {
     setNotice(null);
@@ -142,24 +140,37 @@ function Exercise() {
     }
   };
 
-  // Countdown while memorising. One effect owns the timer, so Ready and the timeout cannot both act.
+  // Three countdowns: the time to memorise, the time to find the square, and the pause on the
+  // result before the next position. One effect owns the timer, so it is cleared the moment the
+  // phase changes and a click and a timeout cannot both act.
+  const countdown =
+    phase === 'memorise'
+      ? { seconds: settings.memoriseSeconds, done: () => dispatch({ type: 'ready', now: Date.now() }) }
+      : phase === 'guessSquare'
+        ? { seconds: settings.guessSeconds, done: () => dispatch({ type: 'guessTimeout' }) }
+        : phase === 'result'
+          ? { seconds: NEXT_AFTER_SECONDS, done: () => void next() }
+          : null;
+  const countdownSeconds = countdown?.seconds ?? null;
+  const countdownDone = useRef<() => void>(() => {});
+  countdownDone.current = countdown?.done ?? (() => {});
   useEffect(() => {
-    if (phase !== 'memorise' || settings.memoriseSeconds === null) {
+    if (countdownSeconds === null) {
       setRemaining(null);
       return;
     }
-    const deadline = Date.now() + settings.memoriseSeconds * 1000;
+    const deadline = Date.now() + countdownSeconds * 1000;
     setRemaining(deadline - Date.now());
     const id = setInterval(() => {
       const left = deadline - Date.now();
       setRemaining(left);
       if (left <= 0) {
         clearInterval(id);
-        dispatch({ type: 'ready', now: Date.now() });
+        countdownDone.current();
       }
     }, 100);
     return () => clearInterval(id);
-  }, [phase, roundIndex, settings.memoriseSeconds]);
+  }, [phase, roundIndex, countdownSeconds]);
 
   useEffect(() => {
     if (phase !== 'mask') return;
@@ -167,12 +178,13 @@ function Exercise() {
     return () => clearTimeout(id);
   }, [phase, settings.maskMs]);
 
-  // The best score as it stood when the session began, so the summary can say "new best" at once.
+  // The best result as it stood when the session began, so the summary can say "new best" at once.
   const newBest =
-    phase === 'summary' && preset !== 'custom' && total > (bestAtStart.current[preset] ?? 0);
+    phase === 'summary' && preset !== 'custom' && correct > (bestAtStart.current[preset] ?? 0);
   useEffect(() => {
-    if (!newBest || preset === 'custom') return;
-    const updated = { ...best, [preset]: total };
+    const current = matchPreset(settings);
+    if (!newBest || current === 'custom') return;
+    const updated = { ...best, [current]: correct };
     setBest(updated);
     writeJson(BEST_KEY, updated);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,6 +193,8 @@ function Exercise() {
   const inSession = phase !== 'idle' && phase !== 'summary';
   const triesLeft = round ? settings.attempts - round.wrongSquares.length : 0;
   const isLastRound = roundIndex + 1 >= settings.rounds;
+  // Positions finished so far; the one on screen counts once it has been answered.
+  const positionsDone = state.history.length + (phase === 'result' ? 1 : 0);
 
   return (
     <div className="mp">
@@ -193,11 +207,15 @@ function Exercise() {
 
         {inSession && (
           <div className="mp-status">
-            <span>
-              Position {roundIndex + 1} of {settings.rounds}
-            </span>
-            <span>
-              Score <strong>{total}</strong>
+            <Progress
+              value={(100 * positionsDone) / settings.rounds}
+              size="md"
+              radius="xl"
+              aria-label={`Position ${roundIndex + 1} of ${settings.rounds}`}
+              className="mp-progress"
+            />
+            <span className="mp-progress-count">
+              {roundIndex + 1}/{settings.rounds}
             </span>
           </div>
         )}
@@ -226,15 +244,10 @@ function Exercise() {
 
         {phase === 'memorise' && (
           <>
-            {remaining !== null && (
-              <div className="mp-clock" role="timer" aria-label="Time left to memorise">
-                {clock(remaining)}
-              </div>
-            )}
+            <div className="mp-clock" role="timer" aria-label="Seconds left to memorise">
+              {seconds(remaining ?? settings.memoriseSeconds * 1000)}
+            </div>
             <p className="mp-prompt">Memorise the position.</p>
-            <Button size="md" onClick={() => dispatch({ type: 'ready', now: Date.now() })}>
-              I'm ready
-            </Button>
           </>
         )}
 
@@ -242,6 +255,9 @@ function Exercise() {
 
         {phase === 'guessSquare' && round && (
           <>
+            <div className="mp-clock mp-clock-guess" role="timer" aria-label="Seconds left to find the square">
+              {seconds(remaining ?? settings.guessSeconds * 1000)}
+            </div>
             <p className="mp-prompt">One piece is gone. Click the square it stood on.</p>
             <p className="mp-note" aria-live="polite">
               {round.wrongSquares.length > 0 && 'Not that square. '}
@@ -250,59 +266,43 @@ function Exercise() {
           </>
         )}
 
-        {phase === 'guessPiece' && round && (
-          <>
-            <p className="mp-prompt">
-              {round.revealed
-                ? `Out of tries. The piece stood on ${round.target.square}. Which piece was it?`
-                : `Yes, ${round.target.square}. Which piece was it?`}
-            </p>
-            <PiecePicker
-              key={roundIndex}
-              onSubmit={(guess) => dispatch({ type: 'submitPiece', guess, now: Date.now() })}
-            />
-          </>
-        )}
+        {phase === 'guessPiece' && round && <p className="mp-prompt">{pieceQuestion(round, settings)}</p>}
 
         {phase === 'result' && round && round.guess && (
           <>
             <div className="mp-answer">
               <PieceIcon color={round.target.color} role={round.target.role} />
-              <p className="mp-prompt">
-                It was the {round.target.color} {round.target.role} on {round.target.square}.
+              <p className={`mp-verdict ${verdict(round).right ? 'is-right' : 'is-wrong'}`} role="status">
+                {verdict(round).text}
               </p>
             </div>
-            {(round.guess.color !== round.target.color || round.guess.role !== round.target.role) && (
-              <p className="mp-note">
-                You said {round.guess.color} {round.guess.role}.
-              </p>
-            )}
-            <ScoreLines round={round} />
-            <div className="mp-actions">
-              <Button size="md" loading={busy} onClick={next}>
-                {isLastRound ? 'See summary' : 'Next position'}
-              </Button>
-              <Anchor
-                href={`https://lichess.org/training/${round.position.id}`}
-                target="_blank"
-                rel="noreferrer"
-                size="sm"
-              >
-                View on Lichess
-              </Anchor>
-            </div>
+            <Button className="mp-next" size="xl" fullWidth loading={busy} onClick={next}>
+              {isLastRound ? 'See summary' : 'Next position'}
+              <span className="mp-next-in" aria-hidden="true">
+                {seconds(remaining ?? NEXT_AFTER_SECONDS * 1000)}
+              </span>
+            </Button>
+            <Anchor
+              className="mp-lichess"
+              href={`https://lichess.org/training/${round.position.id}`}
+              target="_blank"
+              rel="noreferrer"
+              size="xs"
+              c="dimmed"
+            >
+              View on Lichess
+            </Anchor>
           </>
         )}
 
         {phase === 'summary' && (
           <>
-            <div className="mp-clock" aria-label="Session score">
-              {total}
+            <div className="mp-clock" aria-label="Correct positions">
+              {correct}/{state.history.length}
             </div>
             <p className="mp-prompt">
-              {state.history.length} {state.history.length === 1 ? 'position' : 'positions'} played
-              {preset !== 'custom' && ` on ${PRESET_LABEL[preset]}`}.
-              {newBest && ' That is your best score on this preset.'}
+              correct{preset !== 'custom' && ` on ${PRESET_LABEL[preset]}`}.
+              {newBest && ' Your best so far.'}
               {!newBest && preset !== 'custom' && best[preset] !== undefined && ` Your best is ${best[preset]}.`}
             </p>
             <Table className="mp-rounds" verticalSpacing={4} horizontalSpacing="xs">
@@ -310,9 +310,7 @@ function Exercise() {
                 <Table.Tr>
                   <Table.Th>#</Table.Th>
                   <Table.Th>Missing piece</Table.Th>
-                  <Table.Th ta="right">Square</Table.Th>
-                  <Table.Th ta="right">Piece</Table.Th>
-                  <Table.Th ta="right">Total</Table.Th>
+                  <Table.Th ta="right">Result</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -324,9 +322,9 @@ function Exercise() {
                         {r.target.color} {r.target.role}, {r.target.square}
                       </Anchor>
                     </Table.Td>
-                    <Table.Td ta="right">{r.score?.square ?? 0}</Table.Td>
-                    <Table.Td ta="right">{r.score?.piece ?? 0}</Table.Td>
-                    <Table.Td ta="right">{r.score?.total ?? 0}</Table.Td>
+                    <Table.Td ta="right" className={isCorrect(r) ? 'is-right' : 'is-wrong'}>
+                      {isCorrect(r) ? 'Correct' : 'Wrong'}
+                    </Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -347,18 +345,26 @@ function Exercise() {
           </>
         )}
 
-        {inSession && (
-          <Button
-            className="mp-quit"
-            variant="subtle"
-            color="gray"
-            size="compact-sm"
-            onClick={() => dispatch({ type: 'quit' })}
-          >
-            End session
-          </Button>
-        )}
       </div>
+
+      {/* Answering is the only way out: no close button, no Escape, no click outside. */}
+      <Modal
+        opened={phase === 'guessPiece'}
+        onClose={() => {}}
+        withCloseButton={false}
+        closeOnEscape={false}
+        closeOnClickOutside={false}
+        centered
+        size="auto"
+        overlayProps={{ backgroundOpacity: 0.35, blur: 0 }}
+        title={round ? pieceQuestion(round, settings) : ''}
+        classNames={{ title: 'mp-dialog-title' }}
+      >
+        <PiecePicker
+          key={roundIndex}
+          onSubmit={(guess) => dispatch({ type: 'submitPiece', guess, now: Date.now() })}
+        />
+      </Modal>
 
       <Drawer
         opened={settingsOpen}

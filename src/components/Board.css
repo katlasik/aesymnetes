@@ -1,7 +1,7 @@
 /* As large as the screen allows: the full column width, capped so the whole board fits
-   below the site header without scrolling. */
+   in the window (minus the page's top and bottom padding) without scrolling. */
 .board-frame {
-  width: min(100%, calc(100dvh - 120px));
+  width: min(100%, calc(100dvh - 48px));
   min-width: min(100%, 280px);
   aspect-ratio: 1;
   margin-inline: auto;

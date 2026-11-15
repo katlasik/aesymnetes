@@ -44,6 +44,7 @@ export type Action =
   | { type: 'ready'; now: number }
   | { type: 'maskDone'; now: number }
   | { type: 'clickSquare'; square: string }
+  | { type: 'guessTimeout' }
   | { type: 'submitPiece'; guess: PieceGuess; now: number }
   | { type: 'next'; round: NewRound | null }
   | { type: 'quit' };
@@ -102,6 +103,10 @@ export function reduce(state: State, action: Action): State {
       };
     }
 
+    case 'guessTimeout':
+      if (phase !== 'guessSquare' || !round) return state;
+      return { ...state, phase: 'guessPiece', round: { ...round, revealed: true } };
+
     case 'submitPiece': {
       if (phase !== 'guessPiece' || !round) return state;
       const score = scoreRound({
@@ -135,6 +140,22 @@ export function reduce(state: State, action: Action): State {
     case 'quit':
       return initialState(settings);
   }
+}
+
+/** Right when the square was found (not revealed) and both colour and type of the piece are right. */
+export function isCorrect(round: Round): boolean {
+  return (
+    round.guess !== null &&
+    !round.revealed &&
+    round.guess.color === round.target.color &&
+    round.guess.role === round.target.role
+  );
+}
+
+/** Correct rounds so far this session, including an answered round still on screen. */
+export function correctCount(state: State): number {
+  const finished = state.history.filter(isCorrect).length;
+  return finished + (state.round && isCorrect(state.round) ? 1 : 0);
 }
 
 /** Points earned so far this session, including a scored round still on screen. */

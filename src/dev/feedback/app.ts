@@ -224,11 +224,11 @@ export default defineToolbarApp({
       hint.hidden = !on;
       if (!on) closeBox();
       const method = on ? 'addEventListener' : 'removeEventListener';
-      document[method]('mousemove', onMove, true);
-      document[method]('click', onClick, true);
+      document[method]('mousemove', onMove as EventListener, true);
+      document[method]('click', onClick as EventListener, true);
       document[method]('mousedown', swallow, true);
       document[method]('pointerdown', swallow, true);
-      document[method]('keydown', onKey, true);
+      document[method]('keydown', onKey as EventListener, true);
     };
 
     const send = async () => {

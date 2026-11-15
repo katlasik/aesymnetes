@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { initialState, reduce, sessionTotal, type Action, type NewRound, type State } from './machine';
+import { correctCount, initialState, isCorrect, reduce, sessionTotal, type Action, type NewRound, type State } from './machine';
 import { PRESETS } from './settings';
 
 const FEN = 'rnbqkbnr/pppppppp/8/8/4N3/8/PPPPPPPP/R1BQKBNR w KQkq - 0 1';
@@ -75,6 +75,21 @@ test('attempts exhausted reveals the square and still asks for the piece', () =>
   expect(s.round?.revealed).toBe(true);
   const done = reduce(s, { type: 'submitPiece', guess: KNIGHT, now: 1000 });
   expect(done.round?.score).toEqual({ square: 0, piece: 50, bonus: 0, total: 50 });
+});
+
+test('running out of time to find the square reveals it and asks for the piece', () => {
+  const s = reduce(toGuess(), { type: 'guessTimeout' });
+  expect(s.phase).toBe('guessPiece');
+  expect(s.round?.revealed).toBe(true);
+  const done = reduce(s, { type: 'submitPiece', guess: KNIGHT, now: 9000 });
+  expect(done.round?.score).toEqual({ square: 0, piece: 50, bonus: 0, total: 50 });
+});
+
+test('a guess timeout outside the square guess is ignored', () => {
+  const memorise = start();
+  expect(reduce(memorise, { type: 'guessTimeout' })).toBe(memorise);
+  const guessPiece = reduce(toGuess(), { type: 'clickSquare', square: 'e4' });
+  expect(reduce(guessPiece, { type: 'guessTimeout' })).toBe(guessPiece);
 });
 
 test('full correct round on medium scores 150', () => {
@@ -175,6 +190,24 @@ test('out-of-phase actions return the same state object', () => {
     [toResult(), { type: 'submitPiece', guess: KNIGHT, now: 0 }],
   ];
   for (const [state, action] of cases) expect(reduce(state, action)).toBe(state);
+});
+
+test('isCorrect: square found and the whole piece right', () => {
+  expect(isCorrect(toResult().round!)).toBe(true);
+  const wrongColour = play(toGuess(), { type: 'clickSquare', square: 'e4' }, { type: 'submitPiece', guess: { color: 'black', role: 'knight' }, now: 0 });
+  expect(isCorrect(wrongColour.round!)).toBe(false);
+  const timedOut = play(toGuess(), { type: 'guessTimeout' }, { type: 'submitPiece', guess: KNIGHT, now: 0 });
+  expect(isCorrect(timedOut.round!)).toBe(false);
+  const afterAMiss = play(toGuess(), { type: 'clickSquare', square: 'a1' }, { type: 'clickSquare', square: 'e4' }, { type: 'submitPiece', guess: KNIGHT, now: 0 });
+  expect(isCorrect(afterAMiss.round!)).toBe(true);
+  expect(isCorrect(toGuess().round!)).toBe(false);
+});
+
+test('correctCount counts finished rounds and a round still on screen', () => {
+  const s = reduce(toResult(), { type: 'next', round: nr('b') });
+  expect(correctCount(s)).toBe(1);
+  expect(correctCount(toResult())).toBe(1);
+  expect(correctCount(toGuess())).toBe(0);
 });
 
 test('quit returns to idle and keeps settings', () => {
