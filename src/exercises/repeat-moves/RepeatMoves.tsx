@@ -13,7 +13,7 @@ import NextButton from '../../components/exercise/NextButton';
 import ProgressStatus from '../../components/exercise/ProgressStatus';
 import SettingsDrawer from '../../components/exercise/SettingsDrawer';
 import { useCountdown, wholeSeconds } from '../../components/exercise/useCountdown';
-import { loadSequences, pickSequence, type Sequence } from '../../lib/sequences';
+import { displaySquares, loadSequences, pickSequence, userMoveUci, type Sequence } from '../../lib/sequences';
 import { readJson, writeJson } from '../../lib/storage';
 import { correctCount, expectedMove, initialState, isCorrect, reduce, type NewRound, type Round, type State } from './machine';
 import SettingsPanel from './SettingsPanel';
@@ -54,8 +54,10 @@ function positionAfter(seq: Sequence, moves: readonly string[]): Pos {
   return pos;
 }
 
-function squares(uci: string): [string, string] {
-  return [uci.slice(0, 2), uci.slice(2, 4)];
+/** Squares of the last of `moves`, as the user sees it (castling shows the king's real move). */
+function lastMoveSquares(seq: Sequence, moves: readonly string[]): [string, string] | undefined {
+  if (moves.length === 0) return undefined;
+  return displaySquares(positionAfter(seq, moves.slice(0, -1)), moves.at(-1)!);
 }
 
 /** Draws the sequence for round `index`; sequences get more pieces as the session goes on. */
@@ -90,7 +92,7 @@ function verdict(round: Round): { right: boolean; text: string } {
   };
 }
 
-function boardView(state: State, onMove: (orig: string, dest: string) => void): BoardProps {
+function boardView(state: State, onMove: (uci: string) => void): BoardProps {
   const { phase, round, settings } = state;
   const base = { orientation: round?.orientation ?? ('white' as const), coordinates: settings.coordinates };
   if (!round) return { ...base, fen: START_FEN };
@@ -102,33 +104,35 @@ function boardView(state: State, onMove: (orig: string, dest: string) => void): 
     return {
       ...base,
       fen: makeFen(positionAfter(seq, shown).toSetup()),
-      lastMove: shown.length ? squares(shown.at(-1)!) : undefined,
+      lastMove: lastMoveSquares(seq, shown),
       animate: true,
     };
   }
   const pos = positionAfter(seq, round.played);
-  const last = round.played.at(-1);
+  const lastMove = lastMoveSquares(seq, round.played);
   if (phase === 'replay') {
     return {
       ...base,
       fen: makeFen(pos.toSetup()),
-      lastMove: last ? squares(last) : undefined,
+      lastMove,
       animate: true,
       movable: { color: pos.turn, dests: chessgroundDests(pos) },
-      onMove,
+      // Grade the move in the form the data stores it (castling as king-to-rook).
+      onMove: (orig, dest) => onMove(userMoveUci(pos, orig, dest)),
     };
   }
   // result
   if (round.wrongMove) {
-    const expected = expectedMove(round)!;
+    const [eFrom, eTo] = displaySquares(pos, expectedMove(round)!);
+    const [wFrom, wTo] = displaySquares(pos, round.wrongMove);
     const arrows: BoardArrow[] = [
-      { orig: expected.slice(0, 2), dest: expected.slice(2, 4), brush: 'green' },
-      { orig: round.wrongMove.slice(0, 2), dest: round.wrongMove.slice(2, 4), brush: 'red' },
+      { orig: eFrom, dest: eTo, brush: 'green' },
+      { orig: wFrom, dest: wTo, brush: 'red' },
     ];
     // Show the position before the wrong move, with both moves drawn on it.
-    return { ...base, fen: makeFen(pos.toSetup()), lastMove: last ? squares(last) : undefined, arrows };
+    return { ...base, fen: makeFen(pos.toSetup()), lastMove, arrows };
   }
-  return { ...base, fen: makeFen(pos.toSetup()), lastMove: last ? squares(last) : undefined };
+  return { ...base, fen: makeFen(pos.toSetup()), lastMove };
 }
 
 function Exercise() {
@@ -206,7 +210,7 @@ function Exercise() {
   }, [newBest]);
 
   const view = useMemo(
-    () => boardView(state, (orig, dest) => dispatch({ type: 'move', uci: orig + dest })),
+    () => boardView(state, (uci) => dispatch({ type: 'move', uci })),
     [state],
   );
 
