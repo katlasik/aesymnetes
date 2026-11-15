@@ -7,9 +7,33 @@
 
 @media (min-width: 900px) {
   .mp {
-    grid-template-columns: minmax(0, 560px) minmax(300px, 380px);
+    /* The board column is only as wide as the board can be, so the panel stays beside it. */
+    grid-template-columns: minmax(0, calc(100dvh - 120px)) minmax(280px, 340px);
+    justify-content: center;
     gap: 48px;
   }
+}
+
+/* The main action: one large button, full width of the panel. */
+.mp-start {
+  height: 64px;
+  font-size: 1.375rem;
+}
+
+.mp-drawer-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.mp-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 16px;
+}
+
+.mp-drawer-body > p {
+  margin: 0;
 }
 
 .mp-board .board-frame {

@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { Alert, Anchor, Button, MantineProvider, Table } from '@mantine/core';
+import { Alert, Anchor, Button, Drawer, MantineProvider, Table } from '@mantine/core';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import '@mantine/core/styles.css';
 import Board, { type SquareMark } from '../../components/Board';
 import { boardFenWithout, loadPositions, pickRound, type Color } from '../../lib/positions';
@@ -107,6 +108,8 @@ function Exercise() {
   };
 
   const bestAtStart = useRef<Best>(best);
+  const [settingsOpen, { open: openSettings, close: closeSettings }] = useDisclosure(false);
+  const isNarrow = useMediaQuery('(max-width: 899px)') ?? false;
 
   const begin = async () => {
     bestAtStart.current = best;
@@ -201,26 +204,23 @@ function Exercise() {
 
         {phase === 'idle' && (
           <>
-            <p className="mp-lead">
-              Memorise the position. One piece will be removed. Click the square it stood on, then say
-              which piece it was.
-            </p>
-            <SettingsPanel settings={settings} onChange={changeSettings} />
             {notice && (
               <Alert color={notice.kind === 'load' ? 'red' : 'yellow'} role="alert">
                 {notice.text}
               </Alert>
             )}
-            <div className="mp-actions">
-              <Button size="md" loading={busy} onClick={begin}>
-                {notice?.kind === 'load' ? 'Try again' : 'Start'}
-              </Button>
-              {preset !== 'custom' && best[preset] !== undefined && (
-                <span className="mp-best">
-                  Best on {PRESET_LABEL[preset]}: {best[preset]}
-                </span>
-              )}
-            </div>
+            <Button className="mp-start" size="xl" fullWidth loading={busy} onClick={begin}>
+              {notice?.kind === 'load' ? 'Try again' : 'Start'}
+            </Button>
+            <Button
+              variant="subtle"
+              color="gray"
+              leftSection={<GearIcon />}
+              onClick={openSettings}
+              disabled={busy}
+            >
+              Settings: {preset === 'custom' ? 'Custom' : PRESET_LABEL[preset]}
+            </Button>
           </>
         )}
 
@@ -340,8 +340,8 @@ function Exercise() {
               <Button size="md" loading={busy} onClick={begin}>
                 Play again
               </Button>
-              <Button size="md" variant="default" onClick={() => dispatch({ type: 'quit' })}>
-                Change settings
+              <Button size="md" variant="default" leftSection={<GearIcon />} onClick={openSettings}>
+                Settings
               </Button>
             </div>
           </>
@@ -359,7 +359,41 @@ function Exercise() {
           </Button>
         )}
       </div>
+
+      <Drawer
+        opened={settingsOpen}
+        onClose={closeSettings}
+        position={isNarrow ? 'bottom' : 'right'}
+        size={isNarrow ? '90%' : 'md'}
+        title="Settings"
+        classNames={{ title: 'mp-drawer-title' }}
+      >
+        <div className="mp-drawer-body">
+          <p className="mp-lead">
+            Memorise the position. One piece will be removed. Click the square it stood on, then say
+            which piece it was.
+          </p>
+          <SettingsPanel settings={settings} onChange={changeSettings} />
+          {preset !== 'custom' && best[preset] !== undefined && (
+            <p className="mp-best">
+              Best on {PRESET_LABEL[preset]}: {best[preset]}
+            </p>
+          )}
+          <Button fullWidth onClick={closeSettings}>
+            Done
+          </Button>
+        </div>
+      </Drawer>
     </div>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
   );
 }
 
