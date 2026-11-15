@@ -1,0 +1,27 @@
+.board-frame {
+  width: min(100%, 560px);
+  aspect-ratio: 1;
+  margin-inline: auto;
+}
+
+.board-surface {
+  width: 100%;
+  height: 100%;
+}
+
+.board-frame cg-board {
+  cursor: default;
+}
+
+.board-frame.is-clickable cg-board {
+  cursor: pointer;
+}
+
+.board-frame cg-board square.wrong {
+  background-color: rgba(190, 52, 40, 0.6);
+}
+
+.board-frame cg-board square.answer {
+  background-color: rgba(52, 140, 98, 0.65);
+  box-shadow: inset 0 0 0 3px rgba(20, 84, 56, 0.9);
+}
