@@ -1,0 +1,77 @@
+---
+import Base from '../layouts/Base.astro';
+
+const exercises = [
+  {
+    href: '/exercises/missing-piece',
+    name: 'Missing piece',
+    blurb: 'Memorise a position from a real game. One piece disappears. Say where it stood and what it was.',
+  },
+];
+---
+
+<Base title="Exercises">
+  <h1>Exercises</h1>
+  <ol class="exercise-list">
+    {
+      exercises.map((e, i) => (
+        <li>
+          <a href={e.href}>
+            <span class="num">{String(i + 1).padStart(2, '0')}</span>
+            <span class="body">
+              <span class="name">{e.name}</span>
+              <span class="blurb">{e.blurb}</span>
+            </span>
+          </a>
+        </li>
+      ))
+    }
+  </ol>
+</Base>
+
+<style>
+  h1 {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 1.75rem;
+    margin: 0 0 16px;
+  }
+  .exercise-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--line);
+    max-width: 640px;
+  }
+  .exercise-list a {
+    display: flex;
+    gap: 16px;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--line);
+    color: inherit;
+    text-decoration: none;
+  }
+  .exercise-list a:hover .name {
+    color: var(--accent);
+  }
+  .num {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+    padding-top: 4px;
+  }
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .name {
+    font-family: var(--font-body);
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+  .blurb {
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+</style>
