@@ -1,8 +1,8 @@
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import { formatNotes, saveNote, takePending } from './feedback-inbox.mjs';
+import { formatNotes, inboxQuietFor, saveNote, takePending } from './feedback-inbox.mjs';
 
 let dir;
 beforeEach(() => {
@@ -63,6 +63,28 @@ test('a corrupt line is skipped, not fatal', () => {
   saveNote(dir, note('good'), null);
   appendFileSync(join(dir, 'inbox.jsonl'), '{not json\n');
   expect(takePending(dir).map((n) => n.note)).toEqual(['good']);
+});
+
+test('inboxQuietFor: false with no notes', () => {
+  expect(inboxQuietFor(dir, 120_000, Date.now())).toBe(false);
+});
+
+test('inboxQuietFor: false while the last note is newer than the quiet period', () => {
+  saveNote(dir, note('first'), null);
+  expect(inboxQuietFor(dir, 120_000, Date.now() + 60_000)).toBe(false);
+});
+
+test('inboxQuietFor: true once no note has arrived for the quiet period', () => {
+  saveNote(dir, note('first'), null);
+  expect(inboxQuietFor(dir, 120_000, Date.now() + 121_000)).toBe(true);
+});
+
+test('inboxQuietFor: a newer note restarts the quiet period', () => {
+  saveNote(dir, note('first'), null);
+  const later = Date.now() + 100_000;
+  utimesSync(join(dir, 'inbox.jsonl'), new Date(later), new Date(later));
+  expect(inboxQuietFor(dir, 120_000, later + 60_000)).toBe(false);
+  expect(inboxQuietFor(dir, 120_000, later + 121_000)).toBe(true);
 });
 
 test('formatNotes is empty for no notes and readable otherwise', () => {

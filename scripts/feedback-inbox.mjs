@@ -1,6 +1,6 @@
 // Inbox for UI notes sent from the dev toolbar's Feedback tool.
 // Shared by the Astro integration (writes) and scripts/feedback.mjs (reads).
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const INBOX = 'inbox.jsonl';
@@ -57,6 +57,17 @@ export function takePending(dir) {
   if (raw) appendFileSync(join(dir, DONE), raw.endsWith('\n') ? raw : raw + '\n');
   rmSync(claimed);
   return notes;
+}
+
+/**
+ * True when unread notes exist and none has arrived for `quietMs`
+ * (each note appends to the inbox, so its modification time is the latest note's time).
+ */
+export function inboxQuietFor(dir, quietMs, now = Date.now()) {
+  const inbox = join(dir, INBOX);
+  if (!existsSync(inbox)) return false;
+  const { size, mtimeMs } = statSync(inbox);
+  return size > 0 && now - mtimeMs >= quietMs;
 }
 
 /** Readable text for Claude; empty string when there are no notes. */
