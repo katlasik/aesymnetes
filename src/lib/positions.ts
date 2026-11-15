@@ -52,14 +52,34 @@ function pickFrom<T>(items: readonly T[], rng: () => number): T {
   return items[Math.min(items.length - 1, Math.floor(rng() * items.length))]!;
 }
 
-/** Picks an unused position that fits the filter, and a piece to remove from it. */
+/** Where a position falls in a session: the 0-based index and the number of positions. */
+export interface Step {
+  index: number;
+  total: number;
+}
+
+/**
+ * The piece count a session's position should have, so that positions get harder (more pieces)
+ * evenly from the fewest pieces in the range to the most.
+ */
+export function targetPieces(range: { minPieces: number; maxPieces: number }, step: Step): number {
+  if (step.total <= 1) return range.minPieces;
+  const share = Math.min(1, Math.max(0, step.index / (step.total - 1)));
+  return Math.round(range.minPieces + share * (range.maxPieces - range.minPieces));
+}
+
+/**
+ * Picks an unused position that fits the filter, and a piece to remove from it.
+ * With a `step`, it picks among the positions whose piece count is closest to the step's target.
+ */
 export function pickRound(
   pool: readonly Position[],
   filter: { minPieces: number; maxPieces: number; removable: Removable },
   usedIds: ReadonlySet<string>,
   rng: () => number = Math.random,
+  step?: Step,
 ): { position: Position; target: Target } | null {
-  const candidates = pool.filter(
+  let candidates = pool.filter(
     (p) =>
       p.pieces >= filter.minPieces &&
       p.pieces <= filter.maxPieces &&
@@ -67,6 +87,12 @@ export function pickRound(
       eligibleTargets(p.fen, filter.removable).length > 0,
   );
   if (candidates.length === 0) return null;
+  if (step) {
+    const target = targetPieces(filter, step);
+    const distance = (p: Position) => Math.abs(p.pieces - target);
+    const nearest = Math.min(...candidates.map(distance));
+    candidates = candidates.filter((p) => distance(p) === nearest);
+  }
   const position = pickFrom(candidates, rng);
   const target = pickFrom(eligibleTargets(position.fen, filter.removable), rng);
   return { position, target };

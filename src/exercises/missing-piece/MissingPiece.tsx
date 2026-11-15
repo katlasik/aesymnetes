@@ -34,9 +34,10 @@ function loadBest(): Best {
   return best;
 }
 
-async function drawRound(settings: Settings, usedIds: readonly string[]): Promise<NewRound | null> {
+/** Draws the position for round `index`; positions get more pieces as the session goes on. */
+async function drawRound(settings: Settings, usedIds: readonly string[], index: number): Promise<NewRound | null> {
   const pool = await loadPositions();
-  const picked = pickRound(pool, settings, new Set(usedIds));
+  const picked = pickRound(pool, settings, new Set(usedIds), Math.random, { index, total: settings.rounds });
   if (!picked) return null;
   const orientation: Color =
     settings.side === 'random' ? (Math.random() < 0.5 ? 'white' : 'black') : settings.side;
@@ -114,7 +115,7 @@ function Exercise() {
     setBusy(true);
     setNotice(null);
     try {
-      const next = await drawRound(settings, []);
+      const next = await drawRound(settings, [], 0);
       if (next) dispatch({ type: 'start', round: next });
       else {
         setNotice({
@@ -132,7 +133,7 @@ function Exercise() {
   const next = async () => {
     setBusy(true);
     try {
-      dispatch({ type: 'next', round: await drawRound(settings, state.usedIds) });
+      dispatch({ type: 'next', round: await drawRound(settings, state.usedIds, roundIndex + 1) });
     } catch {
       dispatch({ type: 'next', round: null });
     } finally {
