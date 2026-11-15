@@ -4,6 +4,40 @@
   margin-inline: auto;
 }
 
+/* Chessground's default coordinates hang outside the board and are pale. Keep them inside
+   the squares, in the corners, and dark enough to read on both square colours. */
+.board-frame .cg-wrap coords {
+  color: rgba(40, 28, 16, 0.75);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 1;
+}
+
+/* The board theme colours alternate labels light and dark; one dark tone reads on both squares. */
+.board-frame .cg-wrap coords coord {
+  color: rgba(40, 28, 16, 0.75);
+}
+
+.board-frame .cg-wrap coords.ranks {
+  top: 0;
+  left: 3px;
+}
+
+.board-frame .cg-wrap coords.ranks coord {
+  transform: translateY(2px);
+}
+
+.board-frame .cg-wrap coords.files {
+  left: 0;
+  bottom: 1px;
+}
+
+.board-frame .cg-wrap coords.files coord {
+  text-align: right;
+  padding-right: 4px;
+}
+
 .board-surface {
   width: 100%;
   height: 100%;

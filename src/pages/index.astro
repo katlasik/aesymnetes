@@ -12,66 +12,54 @@ const exercises = [
 
 <Base title="Exercises">
   <h1>Exercises</h1>
-  <ol class="exercise-list">
+  <ul class="exercise-list">
     {
-      exercises.map((e, i) => (
+      exercises.map((e) => (
         <li>
           <a href={e.href}>
-            <span class="num">{String(i + 1).padStart(2, '0')}</span>
-            <span class="body">
-              <span class="name">{e.name}</span>
-              <span class="blurb">{e.blurb}</span>
-            </span>
+            <span class="name">{e.name}</span>
+            <span class="blurb">{e.blurb}</span>
           </a>
         </li>
       ))
     }
-  </ol>
+  </ul>
 </Base>
 
 <style>
   h1 {
-    font-family: var(--font-body);
-    font-weight: 600;
-    font-size: 1.75rem;
-    margin: 0 0 16px;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 24px 0 16px;
   }
   .exercise-list {
     list-style: none;
     margin: 0;
     padding: 0;
-    border-top: 1px solid var(--line);
-    max-width: 640px;
+    max-width: 560px;
   }
   .exercise-list a {
-    display: flex;
-    gap: 16px;
-    padding: 16px 4px;
-    border-bottom: 1px solid var(--line);
+    display: block;
+    padding: 16px 0;
+    border-top: 1px solid var(--line);
     color: inherit;
     text-decoration: none;
   }
-  .exercise-list a:hover .name {
-    color: var(--accent);
-  }
-  .num {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: var(--muted);
-    padding-top: 4px;
-  }
-  .body {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+  .exercise-list li:last-child a {
+    border-bottom: 1px solid var(--line);
   }
   .name {
-    font-family: var(--font-body);
-    font-size: 1.15rem;
+    display: block;
+    font-size: 1.1875rem;
     font-weight: 600;
+    color: var(--accent);
+  }
+  .exercise-list a:hover .name {
+    text-decoration: underline;
   }
   .blurb {
+    display: block;
     color: var(--muted);
-    font-size: 0.95rem;
   }
 </style>

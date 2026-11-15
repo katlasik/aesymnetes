@@ -1,4 +1,6 @@
 ---
+import '@fontsource-variable/instrument-sans';
+
 interface Props {
   title: string;
 }
@@ -10,12 +12,15 @@ const { title } = Astro.props;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} · Aesymnetes</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} | Aesymnetes</title>
   </head>
   <body>
     <header class="site-header">
       <a class="site-name" href="/">Aesymnetes</a>
-      <span class="site-tag">chess exercises</span>
+      <nav class="site-nav">
+        <a href="/">Exercises</a>
+      </nav>
     </header>
     <main class="site-main">
       <slot />
@@ -24,26 +29,29 @@ const { title } = Astro.props;
 </html>
 
 <style is:global>
+  /* Cool, quiet surroundings so the wooden board is the only warm object on the page. */
   :root {
     color-scheme: light dark;
-    --bg: #f4f1ea;
-    --surface: #fbf9f4;
-    --ink: #1f1d1a;
-    --muted: #6b665d;
-    --line: #d9d3c5;
-    --accent: #2f5d50;
-    --font-body: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
-    --font-ui: ui-sans-serif, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --bg: #eceff1;
+    --surface: #f8f9fa;
+    --ink: #18212b;
+    --muted: #5c6875;
+    --line: #cdd4da;
+    --accent: #1f4fa3;
+    --good: #2f7d57;
+    --bad: #b8392e;
+    --font: 'Instrument Sans Variable', ui-sans-serif, 'Helvetica Neue', Arial, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #171614;
-      --surface: #1f1e1b;
-      --ink: #ebe6da;
-      --muted: #9a9486;
-      --line: #35332e;
-      --accent: #8fbfae;
+      --bg: #12171d;
+      --surface: #1a212a;
+      --ink: #e3e8ed;
+      --muted: #8d99a6;
+      --line: #2c3640;
+      --accent: #7fa8ee;
+      --good: #6cc198;
+      --bad: #ee8176;
     }
   }
   * {
@@ -53,37 +61,43 @@ const { title } = Astro.props;
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font-family: var(--font-ui);
+    font-family: var(--font);
     line-height: 1.5;
   }
   a {
     color: var(--accent);
   }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .site-header {
     display: flex;
     align-items: baseline;
-    gap: 12px;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--line);
+    justify-content: space-between;
+    gap: 16px;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 16px;
   }
   .site-name {
-    font-family: var(--font-body);
-    font-size: 1.25rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     color: var(--ink);
     text-decoration: none;
   }
-  .site-tag {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+  .site-nav a {
+    font-size: 0.9375rem;
     color: var(--muted);
+    text-decoration: none;
+  }
+  .site-nav a:hover {
+    color: var(--ink);
   }
   .site-main {
     max-width: 1080px;
     margin: 0 auto;
-    padding: 24px 16px 48px;
+    padding: 8px 16px 56px;
   }
 </style>

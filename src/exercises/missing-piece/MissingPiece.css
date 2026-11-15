@@ -1,0 +1,225 @@
+.mp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .mp {
+    grid-template-columns: minmax(0, 560px) minmax(300px, 380px);
+    gap: 48px;
+  }
+}
+
+.mp-board .board-frame {
+  margin-inline: 0;
+}
+
+.mp-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.mp-panel > * {
+  margin: 0;
+}
+
+.mp-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.mp-lead,
+.mp-note {
+  color: var(--muted);
+  max-width: 42ch;
+}
+
+.mp-prompt {
+  font-size: 1.1875rem;
+  line-height: 1.35;
+  max-width: 30ch;
+}
+
+.mp-status {
+  display: flex;
+  justify-content: space-between;
+  align-self: stretch;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-status strong {
+  color: var(--ink);
+}
+
+/* The chess clock: the one loud element. Used for the countdown and the final score. */
+.mp-clock {
+  font-size: clamp(3.5rem, 12vw, 5.5rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.mp-best {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-quit {
+  margin-top: 8px;
+  margin-left: -8px;
+}
+
+.mp-answer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mp-score-lines {
+  align-self: stretch;
+  max-width: 260px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-score-lines > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.mp-score-lines dt {
+  color: var(--muted);
+}
+
+.mp-score-lines dd {
+  margin: 0;
+}
+
+.mp-score-lines .mp-score-total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.mp-score-lines .mp-score-total dt {
+  color: var(--ink);
+}
+
+.mp-rounds {
+  align-self: stretch;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Settings */
+.mp-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-self: stretch;
+}
+
+.mp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mp-field-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9375rem;
+}
+
+.mp-field-label {
+  font-weight: 600;
+}
+
+.mp-field-value {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-switches {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Piece picker */
+.mp-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-self: stretch;
+  max-width: 340px;
+}
+
+.mp-picker-roles {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.mp-picker-role {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  /* Mid-tone so both white and black pieces read clearly. */
+  background: #b9c2ca;
+  cursor: pointer;
+}
+
+.mp-picker-role:hover {
+  border-color: var(--accent);
+}
+
+.mp-picker-role[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.mp-piece-icon {
+  display: block;
+  width: 40px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  flex: none;
+}
+
+.mp-piece-icon piece {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+}
+
+.mp-answer .mp-piece-icon {
+  width: 48px;
+  border-radius: 4px;
+  background: #b9c2ca;
+}
