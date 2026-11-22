@@ -8,6 +8,10 @@ import NextButton from '../../components/exercise/NextButton';
 import ProgressStatus from '../../components/exercise/ProgressStatus';
 import SettingsDrawer from '../../components/exercise/SettingsDrawer';
 import { useCountdown, wholeSeconds } from '../../components/exercise/useCountdown';
+import type { DrillStep } from '../../components/exercise/drill';
+import { useDrillStart } from '../../components/exercise/useDrillStart';
+import type { Messages } from '../../i18n';
+import { useT } from '../../i18n/react';
 import { boardFenWithout, loadPositions, pickRound, type Color } from '../../lib/positions';
 import { readJson, writeJson } from '../../lib/storage';
 import { correctCount, initialState, isCorrect, reduce, type NewRound, type Round, type State } from './machine';
@@ -20,13 +24,11 @@ const SETTINGS_KEY = 'aesymnetes:missing-piece:settings';
 // Best number of correct positions per preset. (The old key held points.)
 const BEST_KEY = 'aesymnetes:missing-piece:best-correct';
 const NEXT_AFTER_SECONDS = 4;
+const PIECE_SECONDS = 8;
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
-const PRESET_LABEL: Record<PresetName, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
-const INTRO =
-  'Memorise the position. One piece will be removed. Click the square it stood on, then say which piece it was.';
 
 type Best = Partial<Record<PresetName, number>>;
-type Notice = { kind: 'load' | 'empty'; text: string } | null;
+type Notice = 'load' | 'empty' | null;
 
 function loadBest(): Best {
   const raw = readJson(BEST_KEY);
@@ -50,11 +52,11 @@ async function drawRound(settings: Settings, usedIds: readonly string[], index: 
   return { ...picked, orientation };
 }
 
-function pieceQuestion(round: Round, settings: Settings): string {
+function pieceQuestion(t: Messages, round: Round, settings: Settings): string {
   const sq = round.target.square;
-  if (!round.revealed) return `Yes, ${sq}. Which piece was it?`;
+  if (!round.revealed) return t.missingPiece.whichPiece(sq);
   const outOfTries = round.wrongSquares.length >= settings.attempts;
-  return `${outOfTries ? 'Out of tries' : "Time's up"}. The piece stood on ${sq}. Which piece was it?`;
+  return t.missingPiece.whichPieceRevealed(sq, outOfTries ? 'outOfTries' : 'timeUp');
 }
 
 function boardView(state: State, onSquare: (sq: string) => void) {
@@ -77,18 +79,20 @@ function boardView(state: State, onSquare: (sq: string) => void) {
 }
 
 /** What happened this round, in one sentence; the answer is always named. */
-function verdict(round: Round): { right: boolean; text: string } {
-  const { color, role, square } = round.target;
-  const answer = `the ${color} ${role} on ${square}`;
-  if (isCorrect(round)) return { right: true, text: `Correct: ${answer}.` };
-  const guess = round.guess!;
-  const pieceRight = guess.color === color && guess.role === role;
-  if (round.revealed && pieceRight) return { right: false, text: `Right piece, but you missed the square. It was ${answer}.` };
-  if (round.revealed) return { right: false, text: `Wrong. It was ${answer}, not the ${guess.color} ${guess.role}.` };
-  return { right: false, text: `Right square, wrong piece. It was ${answer}, not the ${guess.color} ${guess.role}.` };
+function verdict(t: Messages, round: Round): { right: boolean; text: string } {
+  const answer = round.target;
+  const v = t.missingPiece.verdict;
+  if (isCorrect(round)) return { right: true, text: v.correct(answer) };
+  if (!round.guess) return { right: false, text: v.timeUp(answer) };
+  const guess = round.guess;
+  const pieceRight = guess.color === answer.color && guess.role === answer.role;
+  if (round.revealed && pieceRight) return { right: false, text: v.missedSquare(answer) };
+  if (round.revealed) return { right: false, text: v.wrong(answer, guess) };
+  return { right: false, text: v.wrongPiece(answer, guess) };
 }
 
-function Exercise() {
+export function MissingPieceExercise({ drill }: { drill?: DrillStep }) {
+  const t = useT();
   const [state, dispatch] = useReducer(reduce, undefined, () =>
     initialState(sanitize(readJson(SETTINGS_KEY))),
   );
@@ -117,17 +121,15 @@ function Exercise() {
       const next = await drawRound(settings, [], 0);
       if (next) dispatch({ type: 'start', round: next });
       else {
-        setNotice({
-          kind: 'empty',
-          text: 'No position fits these settings. Widen the range of pieces on the board, or allow more kinds of piece to go missing.',
-        });
+        setNotice('empty');
       }
     } catch {
-      setNotice({ kind: 'load', text: 'The positions did not load. Check your connection, then try again.' });
+      setNotice('load');
     } finally {
       setBusy(false);
     }
   };
+  useDrillStart(drill, begin);
 
   const next = async () => {
     setBusy(true);
@@ -140,16 +142,18 @@ function Exercise() {
     }
   };
 
-  // Three countdowns: the time to memorise, the time to find the square, and the pause on the
-  // result before the next position.
+  // Four countdowns: the time to memorise, to find the square, to choose the piece, and the pause
+  // on the result before the next position.
   const remaining = useCountdown(
     phase === 'memorise'
       ? { key: `memorise-${roundIndex}`, seconds: settings.memoriseSeconds, onDone: () => dispatch({ type: 'ready', now: Date.now() }) }
       : phase === 'guessSquare'
         ? { key: `guess-${roundIndex}`, seconds: settings.guessSeconds, onDone: () => dispatch({ type: 'guessTimeout' }) }
-        : phase === 'result'
-          ? { key: `result-${roundIndex}`, seconds: NEXT_AFTER_SECONDS, onDone: () => void next() }
-          : null,
+        : phase === 'guessPiece'
+          ? { key: `piece-${roundIndex}`, seconds: PIECE_SECONDS, onDone: () => dispatch({ type: 'pieceTimeout' }) }
+          : phase === 'result'
+            ? { key: `result-${roundIndex}`, seconds: NEXT_AFTER_SECONDS, onDone: () => void next() }
+            : null,
   );
 
   useEffect(() => {
@@ -175,6 +179,7 @@ function Exercise() {
   const isLastRound = roundIndex + 1 >= settings.rounds;
   // Positions finished so far; the one on screen counts once it has been answered.
   const positionsDone = state.history.length + (phase === 'result' ? 1 : 0);
+  const noticeText = notice === 'load' ? t.common.loadFailed : t.missingPiece.noPositionFits;
 
   return (
     <div className="ex">
@@ -183,62 +188,64 @@ function Exercise() {
       </div>
 
       <div className="ex-panel">
-        <h1 className="ex-title">Missing piece</h1>
+        <h1 className="ex-title">{t.missingPiece.title}</h1>
 
         {inSession && <ProgressStatus done={positionsDone} current={roundIndex + 1} total={settings.rounds} />}
 
         {phase === 'idle' && (
           <>
             {notice && (
-              <Alert color={notice.kind === 'load' ? 'red' : 'yellow'} role="alert">
-                {notice.text}
+              <Alert color={notice === 'load' ? 'red' : 'yellow'} role="alert">
+                {noticeText}
               </Alert>
             )}
-            <Button className="ex-start" size="xl" fullWidth loading={busy} onClick={begin}>
-              {notice?.kind === 'load' ? 'Try again' : 'Start'}
-            </Button>
+            {(!drill || notice) && (
+              <Button className="ex-start" size="xl" fullWidth loading={busy} onClick={begin}>
+                {notice === 'load' ? t.common.tryAgain : t.common.start}
+              </Button>
+            )}
             <Button variant="subtle" color="gray" leftSection={<GearIcon />} onClick={openSettings} disabled={busy}>
-              Settings: {preset === 'custom' ? 'Custom' : PRESET_LABEL[preset]}
+              {t.common.settingsWithPreset(preset)}
             </Button>
           </>
         )}
 
         {phase === 'memorise' && (
           <>
-            <div className="ex-clock" role="timer" aria-label="Seconds left to memorise">
+            <div className="ex-clock" role="timer" aria-label={t.missingPiece.secondsLeftToMemorise}>
               {wholeSeconds(remaining ?? settings.memoriseSeconds * 1000)}
             </div>
-            <p className="ex-prompt">Memorise the position.</p>
+            <p className="ex-prompt">{t.missingPiece.memorise}</p>
           </>
         )}
 
-        {phase === 'mask' && <p className="ex-prompt">Removing one piece.</p>}
+        {phase === 'mask' && <p className="ex-prompt">{t.missingPiece.removing}</p>}
 
         {phase === 'guessSquare' && round && (
           <>
-            <div className="ex-clock ex-clock-small" role="timer" aria-label="Seconds left to find the square">
+            <div className="ex-clock ex-clock-small" role="timer" aria-label={t.missingPiece.secondsLeftToFindSquare}>
               {wholeSeconds(remaining ?? settings.guessSeconds * 1000)}
             </div>
-            <p className="ex-prompt">One piece is gone. Click the square it stood on.</p>
+            <p className="ex-prompt">{t.missingPiece.findSquare}</p>
             <p className="ex-note" aria-live="polite">
-              {round.wrongSquares.length > 0 && 'Not that square. '}
-              {triesLeft === 1 ? '1 try left.' : `${triesLeft} tries left.`}
+              {round.wrongSquares.length > 0 && `${t.missingPiece.notThatSquare} `}
+              {t.missingPiece.triesLeft(triesLeft)}
             </p>
           </>
         )}
 
-        {phase === 'guessPiece' && round && <p className="ex-prompt">{pieceQuestion(round, settings)}</p>}
+        {phase === 'guessPiece' && round && <p className="ex-prompt">{pieceQuestion(t, round, settings)}</p>}
 
-        {phase === 'result' && round && round.guess && (
+        {phase === 'result' && round && (
           <>
             <div className="mp-answer">
               <PieceIcon color={round.target.color} role={round.target.role} />
-              <p className={`ex-verdict ${verdict(round).right ? 'is-right' : 'is-wrong'}`} role="status">
-                {verdict(round).text}
+              <p className={`ex-verdict ${verdict(t, round).right ? 'is-right' : 'is-wrong'}`} role="status">
+                {verdict(t, round).text}
               </p>
             </div>
             <NextButton
-              label={isLastRound ? 'See summary' : 'Next position'}
+              label={isLastRound ? t.common.seeSummary : t.common.nextPosition}
               msLeft={remaining}
               seconds={NEXT_AFTER_SECONDS}
               busy={busy}
@@ -252,27 +259,25 @@ function Exercise() {
               size="xs"
               c="dimmed"
             >
-              View on Lichess
+              {t.common.viewOnLichess}
             </Anchor>
           </>
         )}
 
         {phase === 'summary' && (
           <>
-            <div className="ex-clock" aria-label="Correct positions">
+            <div className="ex-clock" aria-label={t.common.correctPositions}>
               {correct}/{state.history.length}
             </div>
             <p className="ex-prompt">
-              correct{preset !== 'custom' && ` on ${PRESET_LABEL[preset]}`}.
-              {newBest && ' Your best so far.'}
-              {!newBest && preset !== 'custom' && best[preset] !== undefined && ` Your best is ${best[preset]}.`}
+              {t.common.sessionSummary({ preset, newBest, best: preset === 'custom' ? undefined : best[preset] })}
             </p>
             <Table className="ex-rounds" verticalSpacing={4} horizontalSpacing="xs">
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>#</Table.Th>
-                  <Table.Th>Missing piece</Table.Th>
-                  <Table.Th ta="right">Result</Table.Th>
+                  <Table.Th>{t.missingPiece.missingPieceColumn}</Table.Th>
+                  <Table.Th ta="right">{t.common.result}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -281,29 +286,40 @@ function Exercise() {
                     <Table.Td>{i + 1}</Table.Td>
                     <Table.Td>
                       <Anchor href={`https://lichess.org/training/${r.position.id}`} target="_blank" rel="noreferrer" size="sm">
-                        {r.target.color} {r.target.role}, {r.target.square}
+                        {t.missingPiece.historyRow(r.target)}
                       </Anchor>
                     </Table.Td>
                     <Table.Td ta="right" className={isCorrect(r) ? 'is-right' : 'is-wrong'}>
-                      {isCorrect(r) ? 'Correct' : 'Wrong'}
+                      {isCorrect(r) ? t.common.correct : t.common.wrong}
                     </Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
             </Table>
             {notice && (
-              <Alert color={notice.kind === 'load' ? 'red' : 'yellow'} role="alert">
-                {notice.text}
+              <Alert color={notice === 'load' ? 'red' : 'yellow'} role="alert">
+                {noticeText}
               </Alert>
             )}
-            <div className="ex-actions">
-              <Button size="md" loading={busy} onClick={begin}>
-                Play again
+            {drill ? (
+              <Button
+                className="ex-next"
+                size="xl"
+                fullWidth
+                onClick={() => drill.onFinish(t.common.correctOf(correct, state.history.length))}
+              >
+                {drill.isLast ? t.common.finishDrill : t.common.nextExercise}
               </Button>
-              <Button size="md" variant="default" leftSection={<GearIcon />} onClick={openSettings}>
-                Settings
-              </Button>
-            </div>
+            ) : (
+              <div className="ex-actions">
+                <Button size="md" loading={busy} onClick={begin}>
+                  {t.common.playAgain}
+                </Button>
+                <Button size="md" variant="default" leftSection={<GearIcon />} onClick={openSettings}>
+                  {t.common.settings}
+                </Button>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -318,17 +334,20 @@ function Exercise() {
         centered
         size="auto"
         overlayProps={{ backgroundOpacity: 0.35, blur: 0 }}
-        title={round ? pieceQuestion(round, settings) : ''}
+        title={round ? pieceQuestion(t, round, settings) : ''}
         classNames={{ title: 'mp-dialog-title' }}
       >
+        <div className="mp-piece-clock" role="timer" aria-label={t.missingPiece.secondsLeftToChoosePiece}>
+          {wholeSeconds(remaining ?? PIECE_SECONDS * 1000)}
+        </div>
         <PiecePicker key={roundIndex} onSubmit={(guess) => dispatch({ type: 'submitPiece', guess, now: Date.now() })} />
       </Modal>
 
       <SettingsDrawer
         opened={settingsOpen}
         onClose={closeSettings}
-        intro={INTRO}
-        best={preset !== 'custom' && best[preset] !== undefined ? `Best on ${PRESET_LABEL[preset]}: ${best[preset]}` : undefined}
+        intro={t.missingPiece.intro}
+        best={preset !== 'custom' && best[preset] !== undefined ? t.common.bestOn(preset, best[preset]) : undefined}
       >
         <SettingsPanel settings={settings} onChange={changeSettings} />
       </SettingsDrawer>
@@ -339,7 +358,7 @@ function Exercise() {
 export default function MissingPiece() {
   return (
     <ExerciseProvider>
-      <Exercise />
+      <MissingPieceExercise />
     </ExerciseProvider>
   );
 }

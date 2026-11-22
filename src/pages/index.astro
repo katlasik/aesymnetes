@@ -1,70 +1,44 @@
 ---
 import Base from '../layouts/Base.astro';
-
-const exercises = [
-  {
-    href: '/exercises/missing-piece',
-    name: 'Missing piece',
-    blurb: 'Memorise a position from a real game. One piece disappears. Say where it stood and what it was.',
-  },
-  {
-    href: '/exercises/repeat-moves',
-    name: 'Repeat the moves',
-    blurb: 'Watch a few moves from the middle of a real game, then play them again for both sides.',
-  },
-];
 ---
 
-<Base title="Exercises">
-  <h1>Exercises</h1>
-  <ul class="exercise-list">
-    {
-      exercises.map((e) => (
-        <li>
-          <a href={e.href}>
-            <span class="name">{e.name}</span>
-            <span class="blurb">{e.blurb}</span>
-          </a>
-        </li>
-      ))
-    }
-  </ul>
+<Base title="Drill">
+  <div class="home">
+    <h1>Aesymnetes</h1>
+    <p class="lead">Four short chess exercises in a row: Missing piece, Repeat the moves, Find the square, Hanging pieces.</p>
+    <a class="start" href="/drill">Start drill</a>
+  </div>
 </Base>
 
 <style>
+  .home {
+    max-width: 560px;
+  }
   h1 {
     font-size: 2rem;
     font-weight: 700;
     letter-spacing: -0.02em;
-    margin: 24px 0 16px;
+    margin: 24px 0 8px;
   }
-  .exercise-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    max-width: 560px;
+  .lead {
+    color: var(--muted);
+    margin: 0 0 24px;
   }
-  .exercise-list a {
-    display: block;
-    padding: 16px 0;
-    border-top: 1px solid var(--line);
-    color: inherit;
+  .start {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 64px;
+    padding: 0 32px;
+    max-width: 340px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 1.375rem;
+    font-weight: 600;
     text-decoration: none;
   }
-  .exercise-list li:last-child a {
-    border-bottom: 1px solid var(--line);
-  }
-  .name {
-    display: block;
-    font-size: 1.1875rem;
-    font-weight: 600;
-    color: var(--accent);
-  }
-  .exercise-list a:hover .name {
-    text-decoration: underline;
-  }
-  .blurb {
-    display: block;
-    color: var(--muted);
+  .start:hover {
+    filter: brightness(1.08);
   }
 </style>

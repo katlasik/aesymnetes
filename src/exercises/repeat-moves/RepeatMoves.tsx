@@ -13,6 +13,8 @@ import NextButton from '../../components/exercise/NextButton';
 import ProgressStatus from '../../components/exercise/ProgressStatus';
 import SettingsDrawer from '../../components/exercise/SettingsDrawer';
 import { useCountdown, wholeSeconds } from '../../components/exercise/useCountdown';
+import type { DrillStep } from '../../components/exercise/drill';
+import { useDrillStart } from '../../components/exercise/useDrillStart';
 import { displaySquares, loadSequences, pickSequence, userMoveUci, type Sequence } from '../../lib/sequences';
 import { readJson, writeJson } from '../../lib/storage';
 import { correctCount, expectedMove, initialState, isCorrect, reduce, type NewRound, type Round, type State } from './machine';
@@ -24,7 +26,7 @@ const BEST_KEY = 'aesymnetes:repeat-moves:best-correct';
 const NEXT_AFTER_SECONDS = 4;
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const PRESET_LABEL: Record<PresetName, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
-const INTRO =
+export const INTRO =
   'Look at a position from a real game. A few moves play out, then the board goes back. Play the same moves again, for both sides.';
 
 type Best = Partial<Record<PresetName, number>>;
@@ -135,7 +137,7 @@ function boardView(state: State, onMove: (uci: string) => void): BoardProps {
   return { ...base, fen: makeFen(pos.toSetup()), lastMove };
 }
 
-function Exercise() {
+export function RepeatMovesExercise({ drill }: { drill?: DrillStep }) {
   const [state, dispatch] = useReducer(reduce, undefined, () => initialState(sanitize(readJson(SETTINGS_KEY))));
   const [best, setBest] = useState<Best>(loadBest);
   const [notice, setNotice] = useState<Notice>(null);
@@ -167,6 +169,7 @@ function Exercise() {
       setBusy(false);
     }
   };
+  useDrillStart(drill, begin);
 
   const next = async () => {
     setBusy(true);
@@ -237,9 +240,11 @@ function Exercise() {
                 {notice.text}
               </Alert>
             )}
-            <Button className="ex-start" size="xl" fullWidth loading={busy} onClick={begin}>
-              {notice?.kind === 'load' ? 'Try again' : 'Start'}
-            </Button>
+            {(!drill || notice) && (
+              <Button className="ex-start" size="xl" fullWidth loading={busy} onClick={begin}>
+                {notice?.kind === 'load' ? 'Try again' : 'Start'}
+              </Button>
+            )}
             <Button variant="subtle" color="gray" leftSection={<GearIcon />} onClick={openSettings} disabled={busy}>
               Settings: {preset === 'custom' ? 'Custom' : PRESET_LABEL[preset]}
             </Button>
@@ -339,14 +344,25 @@ function Exercise() {
                 {notice.text}
               </Alert>
             )}
-            <div className="ex-actions">
-              <Button size="md" loading={busy} onClick={begin}>
-                Play again
+            {drill ? (
+              <Button
+                className="ex-next"
+                size="xl"
+                fullWidth
+                onClick={() => drill.onFinish(`${correct}/${state.history.length} correct`)}
+              >
+                {drill.isLast ? 'Finish drill' : 'Next exercise'}
               </Button>
-              <Button size="md" variant="default" leftSection={<GearIcon />} onClick={openSettings}>
-                Settings
-              </Button>
-            </div>
+            ) : (
+              <div className="ex-actions">
+                <Button size="md" loading={busy} onClick={begin}>
+                  Play again
+                </Button>
+                <Button size="md" variant="default" leftSection={<GearIcon />} onClick={openSettings}>
+                  Settings
+                </Button>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -366,7 +382,7 @@ function Exercise() {
 export default function RepeatMoves() {
   return (
     <ExerciseProvider>
-      <Exercise />
+      <RepeatMovesExercise />
     </ExerciseProvider>
   );
 }

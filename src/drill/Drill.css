@@ -1,0 +1,43 @@
+.drill-step {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.drill-intro-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.drill-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.drill-intro-text {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+
+.drill-intro-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.drill-done {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  max-width: 480px;
+}
+
+.drill-done > * {
+  margin: 0;
+}

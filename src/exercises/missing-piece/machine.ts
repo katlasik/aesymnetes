@@ -24,6 +24,8 @@ export interface Round extends NewRound {
   revealed: boolean;
   guessStartedAt: number | null;
   guess: PieceGuess | null;
+  /** True when time ran out before a piece was chosen. */
+  pieceTimedOut: boolean;
   score: RoundScore | null;
 }
 
@@ -46,6 +48,7 @@ export type Action =
   | { type: 'clickSquare'; square: string }
   | { type: 'guessTimeout' }
   | { type: 'submitPiece'; guess: PieceGuess; now: number }
+  | { type: 'pieceTimeout' }
   | { type: 'next'; round: NewRound | null }
   | { type: 'quit' };
 
@@ -54,7 +57,7 @@ export function initialState(settings: Settings): State {
 }
 
 function freshRound(r: NewRound): Round {
-  return { ...r, wrongSquares: [], revealed: false, guessStartedAt: null, guess: null, score: null };
+  return { ...r, wrongSquares: [], revealed: false, guessStartedAt: null, guess: null, pieceTimedOut: false, score: null };
 }
 
 /**
@@ -120,6 +123,14 @@ export function reduce(state: State, action: Action): State {
       });
       return { ...state, phase: 'result', round: { ...round, guess: action.guess, score } };
     }
+
+    case 'pieceTimeout':
+      if (phase !== 'guessPiece' || !round) return state;
+      return {
+        ...state,
+        phase: 'result',
+        round: { ...round, pieceTimedOut: true, score: { square: 0, piece: 0, bonus: 0, total: 0 } },
+      };
 
     case 'next': {
       if (phase !== 'result' || !round) return state;

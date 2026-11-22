@@ -9,7 +9,7 @@ import 'chessground/assets/chessground.brown.css';
 import 'chessground/assets/chessground.cburnett.css';
 import './Board.css';
 
-export type SquareMark = 'wrong' | 'answer';
+export type SquareMark = 'wrong' | 'answer' | 'picked' | 'missed';
 
 export interface BoardArrow {
   orig: string;

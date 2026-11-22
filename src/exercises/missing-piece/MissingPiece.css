@@ -5,6 +5,14 @@
   max-width: 34ch;
 }
 
+.mp-piece-clock {
+  font-size: 2.5rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin-bottom: 12px;
+}
+
 .mp-answer {
   display: flex;
   align-items: center;

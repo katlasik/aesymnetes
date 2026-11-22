@@ -92,6 +92,17 @@ test('a guess timeout outside the square guess is ignored', () => {
   expect(reduce(guessPiece, { type: 'guessTimeout' })).toBe(guessPiece);
 });
 
+test('running out of time to choose the piece ends the round as wrong, with no guess', () => {
+  const choosing = reduce(toGuess(), { type: 'clickSquare', square: 'e4' });
+  const s = reduce(choosing, { type: 'pieceTimeout' });
+  expect(s.phase).toBe('result');
+  expect(s.round?.guess).toBeNull();
+  expect(s.round?.pieceTimedOut).toBe(true);
+  expect(isCorrect(s.round!)).toBe(false);
+  expect(reduce(s, { type: 'pieceTimeout' })).toBe(s);
+  expect(reduce(toGuess(), { type: 'pieceTimeout' }).phase).toBe('guessSquare');
+});
+
 test('full correct round on medium scores 150', () => {
   const s = toResult();
   expect(s.phase).toBe('result');

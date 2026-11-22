@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Button, Drawer } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
+import { useT } from '../../i18n/react';
 
 /** Settings in a side panel (from the bottom on phones), with the exercise's instructions on top. */
 export default function SettingsDrawer(p: {
@@ -10,6 +11,7 @@ export default function SettingsDrawer(p: {
   best?: string;
   children: ReactNode;
 }) {
+  const t = useT();
   const isNarrow = useMediaQuery('(max-width: 899px)') ?? false;
   return (
     <Drawer
@@ -17,7 +19,7 @@ export default function SettingsDrawer(p: {
       onClose={p.onClose}
       position={isNarrow ? 'bottom' : 'right'}
       size={isNarrow ? '90%' : 'md'}
-      title="Settings"
+      title={t.common.settings}
       classNames={{ title: 'ex-drawer-title' }}
     >
       <div className="ex-drawer-body">
@@ -25,7 +27,7 @@ export default function SettingsDrawer(p: {
         {p.children}
         {p.best && <p className="ex-best">{p.best}</p>}
         <Button fullWidth onClick={p.onClose}>
-          Done
+          {t.common.done}
         </Button>
       </div>
     </Drawer>

@@ -1,0 +1,7 @@
+.fs-target {
+  font-size: clamp(4.5rem, 16vw, 7.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}

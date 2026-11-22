@@ -19,3 +19,4 @@ Chess exercises site: Astro + React, Mantine, chessground, chessops. Static, no 
 - `npm run dev` — dev server
 - `npm run build` — static build into `dist/`
 - `npm test` — Vitest
+- `npm run test:e2e` — Playwright, desktop and phone, against a fresh build served by `astro preview` on port 4329. Tests in `e2e/` swap `positions.json` and `sequences.json` for fixtures with known answers and skip countdowns with Playwright's clock. Reports and traces go to `tmp/playwright/`. First time on a machine: `npx playwright install chromium`.
