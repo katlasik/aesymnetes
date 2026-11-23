@@ -8,6 +8,7 @@
     "dev": "astro dev --force",
     "build": "astro build",
     "preview": "astro preview",
+    "typecheck": "astro sync && tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test"
   },
